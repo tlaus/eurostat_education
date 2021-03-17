@@ -1,8 +1,11 @@
 ---
-title: "Entrants"
+title: "Entrants into general upper secondary education in Europe"
 author: "Tereza Lausová"
 date: "16 3 2021"
-output: html_document
+output:
+  # pdf_document: default
+  html_document: default
+runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
@@ -12,6 +15,8 @@ library(here)
 library(tidyverse)
 library(sf)
 library(geojsonio)
+library(shiny)
+library(plotly)
 ```
 
 # Data
@@ -19,7 +24,8 @@ library(geojsonio)
 I downloaded the Europe map from https://geojson-maps.ash.ms and included some other countries, e.g. Turkey. Data about the new entrants into secondary schools comes from EUROSTAT. The data was processed into tidy format beforehead, and updated so that the country names correspond between the two files and can be used as IDs.
 
 ```{r source-loading}
-general <- openxlsx::read.xlsx(xlsxFile = here("source/27_New_entrants_upper_secondary_and_higher_different_levels_and_fields.xlsx"), sheet="General vyvoj") %>%
+general <- openxlsx::read.xlsx(xlsxFile = here("source/27_New_entrants_upper_secondary_and_higher_different_levels_and_fields.xlsx"), 
+                               sheet="General vyvoj") %>%
   tibble() %>%
   rename(entrants_2016 = `2016` , entrants_2017 = `2017`, entrants_2018 = `2018`) %>%
   rowwise() %>%
@@ -40,9 +46,12 @@ These maps display the percentage of pupils that have entered general upper seco
 ggplot(data=annotated) +
   geom_sf(aes(fill=entrants_2018))+
   theme_void() +
-  scale_fill_viridis_c(option="C", name = "Percent of entrants") + # Change legend title
-  # geom_sf_text(aes(label=sovereignt)) + # Uncomment this to label countries with their names, overlaps a lot
-  geom_sf_label(aes(label=round(entrants_2018,1)), size = 3) + # Change size if too big/small
+  ## Set scale, change legend title:
+  scale_fill_viridis_c(option="C", name = "Percent of entrants") + 
+  ## Uncomment this to label countries with their names, overlaps a lot:
+  # geom_sf_text(aes(label=sovereignt)) + 
+  ## Change size if too big/small
+  geom_sf_label(aes(label=round(entrants_2018,1)), size = 3) + 
   labs(title = "Upper secondary education - general school entrants in 2018",
        caption = "Data from EUROSTAT")
 
@@ -50,7 +59,8 @@ ggplot(data=annotated) +
   geom_sf(aes(fill=change))+
   theme_void() +
   scale_fill_gradient2(low="blue",mid="white",high = "red", midpoint = 0, name = "Percent change") +
-  geom_sf_text(aes(label=round(change,1)), size = 4) + # geom_sf_label makes a rectangle behind the text, geom_sf_text just prints the text
+  ## geom_sf_label makes a rectangle behind the text, geom_sf_text just prints the text
+  geom_sf_text(aes(label=round(change,1)), size = 4) + 
   labs(title = "Change in general upper secondary school entrants between 2016 and 2018",
        caption = "Data from EUROSTAT")
 ```
@@ -63,23 +73,45 @@ As seen from the previous graphs, the Czech republic is among the countries with
 ggplot(data=annotated) +
   theme_light() +
   # geom_boxplot(aes(x=economy,y=entrants_2018,fill=economy)) +
-  geom_point(data=annotated[!annotated$sovereignt=="Czech Republic",], aes(x=economy,y=entrants_2018,color=economy), position = position_jitter(width=0.25, height = 0)) +
-  geom_point(data=annotated[annotated$sovereignt=="Czech Republic",], aes(x=economy,y=entrants_2018,group=economy),color="red") +
-  geom_segment(data=annotated[annotated$sovereignt=="Czech Republic",], aes(x=2.5,y=entrants_2018,xend=economy,yend=entrants_2018),size=1,color="red",arrow=arrow(length = unit(0.2, "cm"))) + # added the arrow, the `x` is the position of the label --> second category (2) and a half to make it into the middle (0.5)
-  geom_label(data=annotated[annotated$sovereignt=="Czech Republic",], aes(x=economy,y=entrants_2018),color="red", nudge_x = 0.5,label="Czech\n republic") +
+  geom_point(data=annotated[!annotated$sovereignt=="Czech Republic",], 
+             aes(x=economy,y=entrants_2018,color=economy), 
+             position = position_jitter(width=0.25, height = 0)) +
+  geom_point(data=annotated[annotated$sovereignt=="Czech Republic",], 
+             aes(x=economy,y=entrants_2018,group=economy),
+             color="red") +
+  ## added the arrow, the `x` is the position of the label --> second category (2) and a half to make it into the middle (0.5)
+  geom_segment(data=annotated[annotated$sovereignt=="Czech Republic",],
+               aes(x=2.5,y=entrants_2018,xend=economy,yend=entrants_2018),
+               size=1,color="red",arrow=arrow(length = unit(0.2, "cm"))) +
+  geom_label(data=annotated[annotated$sovereignt=="Czech Republic",], 
+             aes(x=economy,y=entrants_2018),
+             color="red", nudge_x = 0.5,label="Czech\n republic") +
   labs(x="Economy category", y="Entrants in 2018 [%]",
        title = "General upper secondary school entrants by country's economy",
        caption = "Data from EUROSTAT") +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) # Change the axis text angle  
+  ## Change the axis text angle  
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) 
 
 ggplot(data=annotated) +
   theme_light() +
-  # geom_boxplot(aes(x=income_grp,y=entrants_2018,fill=income_grp)) + # The boxplot is not the best option, because the second income category has only two countries in it
-  geom_point(data=annotated[!annotated$sovereignt=="Czech Republic",], aes(x=income_grp,y=entrants_2018,color=income_grp), position = position_jitter(width=0.25, height = 0)) +
-  geom_point(data=annotated[annotated$sovereignt=="Czech Republic",], aes(x=income_grp,y=entrants_2018,group=income_grp),color="red") + # Highlighting Czech republic value
-  geom_segment(data=annotated[annotated$sovereignt=="Czech Republic",], aes(x=1.5,y=entrants_2018,xend=income_grp,yend=entrants_2018),size=1,color="red",arrow=arrow(length = unit(0.2, "cm"))) + # added the arrow
-  geom_label(data=annotated[annotated$sovereignt=="Czech Republic",], aes(x=income_grp,y=entrants_2018),color="red", nudge_x = 0.5,label="Czech\n republic") + # could also include the label in aes as `label=sovereignt`, but I wanted to break the long name over two lines
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + # Change the axis text angle
+  ## The boxplot is not the best option, because the second income category has only two countries in it
+  # geom_boxplot(aes(x=income_grp,y=entrants_2018,fill=income_grp)) + 
+  ## I need to filter all countries that are not CZE, because later I want to add it as a separate point:
+  geom_point(data=annotated[!annotated$sovereignt=="Czech Republic",], 
+             aes(x=income_grp,y=entrants_2018,color=income_grp), 
+             position = position_jitter(width=0.25, height = 0)) +
+  ## Highlighting Czech republic value
+  geom_point(data=annotated[annotated$sovereignt=="Czech Republic",], 
+             aes(x=income_grp,y=entrants_2018,group=income_grp),
+             color="red") + 
+  geom_segment(data=annotated[annotated$sovereignt=="Czech Republic",],
+               aes(x=1.5,y=entrants_2018,xend=income_grp,yend=entrants_2018),
+               size=1,color="red",arrow=arrow(length = unit(0.2, "cm"))) +
+  ## This could also include the label in aes as `label=sovereignt`, but I wanted to break the long name over two lines with \n:
+  geom_label(data=annotated[annotated$sovereignt=="Czech Republic",], 
+             aes(x=income_grp,y=entrants_2018),
+             color="red", nudge_x = 0.5,label="Czech\n republic") + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
     labs(x="Income group", y="Entrants in 2018 [%]",
       title = "General upper secondary school entrants by country's income group",
        caption = "Data from EUROSTAT") 
@@ -87,12 +119,64 @@ ggplot(data=annotated) +
 ggplot(data=annotated) +
   theme_light() +
   geom_point(aes(x=gdp_md_est,y=entrants_2018)) +
-  geom_point(data=annotated[annotated$sovereignt=="Czech Republic",], aes(x=gdp_md_est ,y=entrants_2018,group=gdp_md_est ),color="red") +
-  geom_segment(data=annotated[annotated$sovereignt=="Czech Republic",], aes(x=annotated$gdp_md_est[annotated$sovereignt=="Czech Republic"]*2,y=entrants_2018,xend=gdp_md_est,yend=entrants_2018),size=1,color="red",arrow=arrow(length = unit(0.2, "cm"))) + # added the arrow
-  geom_label(data=annotated[annotated$sovereignt=="Czech Republic",], aes(x=gdp_md_est,y=entrants_2018),color="red",label="Czech\n republic",nudge_x = annotated$gdp_md_est[annotated$sovereignt=="Czech Republic"]*1.3) +
+  geom_point(data=annotated[annotated$sovereignt=="Czech Republic",], 
+             aes(x=gdp_md_est ,y=entrants_2018,group=gdp_md_est ),
+             color="red") +
+  geom_segment(data=annotated[annotated$sovereignt=="Czech Republic",], 
+               aes(x=annotated$gdp_md_est[annotated$sovereignt=="Czech Republic"]*2,y=entrants_2018,xend=gdp_md_est,yend=entrants_2018),
+               size=1,color="red",arrow=arrow(length = unit(0.2, "cm"))) +
+  geom_label(data=annotated[annotated$sovereignt=="Czech Republic",], 
+             aes(x=gdp_md_est,y=entrants_2018),
+             color="red",label="Czech\n republic",nudge_x = annotated$gdp_md_est[annotated$sovereignt=="Czech Republic"]*1.3) +
   labs(x="GDP estimate [million $]", y="Entrants in 2018 [%]",
        title = "General upper secondary school entrants by country's GDP estimate",
        caption = "Data from EUROSTAT")
 
+```
+
+# Comparisons, but interactive
+
+This is basically the same as previous plots, but I made them interactive with Shiny R.
+
+We can see that the Czech republic comes in all comparisons close to the bottom. In terms of upper secondary education entrants, the Czech republic is closest to its neighbor Slovakia and southern European states from the former Yugoslavia (Croatia, Serbia and Slovenia), from which data are available. The Czech republic has higher GDP and population than all of these countries. These five countries are comparable in terms of income and economy categories, where only Serbia is a developing region with lower income than the others.
+
+In general, however, the GDP or income is not predictive of the amount of general upper secondary  entrants in a given country. Cyprus, Lithuania, Sweden, Denmark and Greece are similar to Czech republic in terms of GDP, but have larger proportions of pupils entering general schools.
+The Czech republic has the lowest percentage of general upper secondary school entrants of the Visegrad Four.
+
+```{r interactive-comparisons}
+inputPanel(
+  selectInput(inputId = "xaxis",
+              choices = c("GDP (est)", "Economy", "Income", "Subregion", "Population (est)"),
+              multiple = FALSE,
+              label = "Select variable for y axis"),
+  selectInput(inputId = "year", 
+              choices = c("2016", "2017", "2018"), 
+              label = "Which year to compare", 
+              selected = "2018")
+) # close inputPanel
+
+
+renderPlotly({
+  plot_ly(data = annotated %>% tibble(),
+          x=~switch(input$xaxis,
+                    "GDP (est)"=gdp_md_est, 
+                    "Economy"=economy, 
+                    "Income"=income_grp, 
+                    "Subregion"=subregion, 
+                    "Population (est)"=pop_est),
+          y=~switch(input$year,
+                    "2016"=entrants_2016, 
+                    "2017"=entrants_2017, 
+                    "2018"=entrants_2018),
+          type = 'scatter',
+          mode = 'markers',
+          hovertext=~sovereignt,
+          color=~sovereignt=="Czech Republic",
+          colors=c("black","red"),
+          showlegend=FALSE) %>%
+    layout(title=glue::glue("Percentage of entrants into general upper secondary education in {input$year}, based on {input$xaxis}"),
+           xaxis=list(title=input$xaxis),
+           yaxis=list(title=glue::glue("% of entrants in {input$year}")))
+})
 ```
 
