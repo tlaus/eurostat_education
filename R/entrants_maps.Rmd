@@ -1,0 +1,74 @@
+---
+title: "Entrants"
+author: "Tereza Lausová"
+date: "16 3 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(openxlsx)
+library(here)
+library(tidyverse)
+library(sf)
+library(geojsonio)
+```
+
+```{r source-loading}
+general <- openxlsx::read.xlsx(xlsxFile = here("source/27_New_entrants_upper_secondary_and_higher_different_levels_and_fields.xlsx"), sheet="General vyvoj") %>%
+  tibble() %>%
+  rename(entrants_2016 = `2016` , entrants_2017 = `2017`, entrants_2018 = `2018`) %>%
+  rowwise() %>%
+  mutate("trend"=entrants_2018-entrants_2016)
+
+europe_map <- geojson_read(x = here("source/europe2.geo.json"), what = "sp") %>%
+  st_as_sf() %>%
+  st_crop(x=.,y=c("xmin"=-30, "xmax"= 45, "ymin" = 30, "ymax"= 75))
+
+annotated <- left_join(europe_map, general, by=c("sovereignt"="GEO/TIME"))
+
+# general$`GEO/TIME`[!general$`GEO/TIME` %in% annotated$sovereignt]
+# general$entrants_2018[general$`GEO/TIME`=="Hungary"]
+# annotated$entrants_2018[annotated$sovereignt=="Hungary"]
+
+# annotated %>% tibble()
+
+ggplot(data=annotated) +
+  geom_sf(aes(fill=entrants_2018))+
+  theme_void() +
+  # coord_sf(xlim = c(-30,40), ylim = c(30,70))+
+  scale_fill_viridis_c(option="C") +
+  # geom_sf_text(aes(label=sovereignt))+
+  geom_sf_text(aes(label=round(entrants_2018,1)))
+
+ggplot(data=annotated) +
+  geom_sf(aes(fill=trend))+
+  theme_void() +
+  # coord_sf(xlim = c(-30,40), ylim = c(30,70))+
+  # scale_fill_viridis_c(option="C") +
+  scale_fill_gradient2(low="blue",mid="white",high = "red", midpoint = 0) +
+  geom_sf_text(aes(label=round(trend,1)))
+
+ggplot(data=annotated) +
+  theme_light() +
+  geom_boxplot(aes(x=economy,y=entrants_2018,fill=economy)) +
+  geom_point(data=annotated[annotated$sovereignt=="Czech Republic",], aes(x=economy,y=entrants_2018,group=economy),color="red")
+
+ggplot(data=annotated) +
+  theme_light() +
+  geom_boxplot(aes(x=income_grp,y=entrants_2018,fill=income_grp)) +
+  geom_point(data=annotated[annotated$sovereignt=="Czech Republic",], aes(x=income_grp,y=entrants_2018,group=income_grp),color="red")
+
+
+correlated <- cor.test(x = annotated$gdp_md_est[!is.na(annotated$entrants_2018)], y = annotated$entrants_2018[!is.na(annotated$entrants_2018)], method = "pearson")
+lm(annotated$gdp_md_est[!is.na(annotated$entrants_2018)]~annotated$entrants_2018[!is.na(annotated$entrants_2018)])
+
+
+ggplot(data=annotated) +
+  theme_light() +
+  geom_point(aes(x=gdp_md_est,y=entrants_2018)) +
+  geom_point(data=annotated[annotated$sovereignt=="Czech Republic",], aes(x=gdp_md_est ,y=entrants_2018,group=gdp_md_est ),color="red")+
+  geom_smooth(aes(x=gdp_md_est,y=entrants_2018),method='lm')
+
+```
+
