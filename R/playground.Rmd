@@ -1,0 +1,102 @@
+---
+title: "Playground"
+author: "Tereza Lausová"
+date: "24 3 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(eurostat)
+library(czso)
+```
+
+```{r eurostat_playground}
+eurostat_overview <- get_eurostat_toc()
+
+education_data <- eurostat_overview[str_detect(string = eurostat_overview$title,pattern = "[Ee]ducation"),] %>%
+  tibble() %>%
+  filter(type == "dataset")
+
+education_data
+
+## Pupils enrolled in upper secondary education by programme orientation, sex and NUTS2 regions
+educ_uoe_enrs06 <- get_eurostat("educ_uoe_enrs06",update_cache = TRUE) %>%
+  add_nuts_level()
+educ_uoe_enrs06
+
+# head(educ_uoe_enrs06)
+# unique(educ_uoe_enrs06$geo)
+# plot(educ_uoe_enrs06$values[educ_uoe_enrs06$geo=="European Union - 28 countries (2013-2020)"]~educ_uoe_enrs06$time[educ_uoe_enrs06$geo=="European Union - 28 countries (2013-2020)"],ylim=c(0))
+# points(educ_uoe_enrs06$values[educ_uoe_enrs06$geo=="Cesko"]~educ_uoe_enrs06$time[educ_uoe_enrs06$geo=="Cesko"],col="red")
+
+ggplot() +
+  geom_point(data = educ_uoe_enrs06 %>% 
+               filter(nuts_level==0,sex=="T",values>0) %>% 
+               group_by(isced11) %>%
+               drop_na(),
+             aes(x=time,y=values,color=isced11,group = isced11)) + 
+  geom_smooth(data = educ_uoe_enrs06 %>% 
+                filter(nuts_level==0,sex=="T",values>0) %>% 
+                group_by(isced11) %>%
+                drop_na(),
+              aes(x=time,y=values,color=isced11,group = isced11),
+              linetype = "dotted") + 
+    geom_line(data = educ_uoe_enrs06 %>% 
+              filter(geo=="CZ",sex=="T"), 
+            aes(x = time,y=values,color=isced11),
+            stat = "identity", size = 2) +
+  # guides(color="none") +
+  theme_minimal()
+
+
+```
+
+```{r csu_playground}
+csu_overview <- czso_get_catalogue() #%>%
+  # select(dataset_id, title,start,end)
+
+csu_overview %>% View()
+
+
+csu_filtered <- csu_overview %>%
+  # filter(str_detect(string = title, pattern = c("[Čč]íseln")) == FALSE) %>%
+  filter(str_detect(string = title, pattern = c("Volby")) == FALSE) %>%
+  filter(str_detect(string = keywords, pattern = c("vzdělávání"))) %>%
+  # select(dataset_id, title,start,end) %>%
+  arrange(title)
+  # [str_detect(string = csu_overview$title,pattern = "vzdělání"),]
+csu_filtered 
+
+
+vyzkum_vyvoj <- czso_get_table(dataset_id = "210014")
+obyvatelstvo <- czso_get_table(dataset_id = "130142")
+ukazatele <- czso_get_table(dataset_id = "990124-17")
+studenti <- czso_get_codelist("230057", force_redownload = TRUE)
+test <- czso_get_codelist("cis5177",force_redownload = TRUE)
+
+ukazatele %>%
+  filter(str_detect(string = text, pattern = c("žák")) == TRUE)
+
+map(unique(vyzkum_vyvoj$ukazatel_txt), .f = function(ukazatel) {
+  vyzkum_vyvoj %>%
+  filter(ukazatel_txt == ukazatel) %>%
+  select(hodnota, rok, uzemi_txt) %>%
+  filter(uzemi_txt != "Česká republika") %>%
+  ggplot(data = .) +
+  geom_line(aes(x=rok,y=hodnota,color=uzemi_txt)) +
+    labs(title = ukazatel)
+})
+
+vyzkum_vyvoj %>%
+  filter(ukazatel_txt %in% c("Výdaje na VaV financované z veřejných zdrojů z ČR", "Pracoviště výzkumu a vědy")) %>%
+  select(hodnota, rok, uzemi_txt, ukazatel_txt) %>%
+  pivot_wider(names_from = ukazatel_txt, values_from = hodnota) %>%
+  filter(uzemi_txt != "Česká republika") %>%
+  ggplot(data = .) +
+  geom_line(aes(x=`Pracoviště výzkumu a vědy`,y=`Výdaje na VaV financované z veřejných zdrojů z ČR`,color=uzemi_txt)) +
+  geom_text(aes(x=`Pracoviště výzkumu a vědy`,y=`Výdaje na VaV financované z veřejných zdrojů z ČR`,color=uzemi_txt, label = uzemi_txt))
+
+```
+
